@@ -253,6 +253,20 @@ void loop()
 // =======================================================================================
 
 // SAMPLE CUSTOM DROID FUNCTION from PS3 REQUEST - REMOVE ONCE YOU UNDERSTAND STRUCTURE
+long M3D3Max(long a, long b) {
+    if (a > b) {
+      return a;
+    }
+    return b;
+}
+
+long M3D3Min(long a, long b) {
+    if (a < b) {
+      return a;
+    }
+    return b;
+}
+
 void callMyArrowUpFunction()
 {
     Serial.println("Droid is now executing my custom ARROW UP function");
@@ -284,8 +298,8 @@ void moveServoByJoystick() {
 
 void moveDroid() { //not finished, but a start
   if (reqLeftJoyMade) {
-    currentSpeed = reqLeftJoyYValue;
-    currentTurn = reqLeftJoyXValue;
+    currentSpeed = M3D3Max(M3D3Min(currentSpeed + 1, reqLeftJoyYValue), currentSpeed - 1);
+    currentTurn = reqLeftJoyXValue/M3D3Max(1, M3D3Max(currentSpeed, currentSpeed * -1)/5);
     ST->turn(currentTurn);
     ST->drive(currentSpeed);
     if (!droidMoving) {
@@ -293,10 +307,17 @@ void moveDroid() { //not finished, but a start
     }
   } else {
     if (droidMoving) {
+      currentSpeed = M3D3Min(M3D3Max(currentSpeed - 1, 0), currentSpeed + 1);
+      currentTurn = M3D3Max(currentTurn - 1, 0);
+      if (currentSpeed) {
+        ST->turn(currentTurn);
+        ST->drive(currentSpeed);
+      } else {
       ST->stop();
       droidMoving = false;
       currentTurn = 0;
       currentSpeed = 0;
+      }
     }
   }
 }
