@@ -39,7 +39,7 @@ uint32_t lastMsgTime = 0;
 uint32_t currentTime = 0;
 uint32_t lastLoopTime = 0;
 int badPS3Data = 0;
-byte joystickDeadZoneRange = 15;
+byte joystickDeadZoneRange = 40;
 
 boolean isPS3ControllerInitialized = false;
 boolean mainControllerConnected = false;
@@ -118,6 +118,25 @@ Sabertooth *ST = new Sabertooth(SABERTOOTH_ADDR, Serial1); //tx 1 (pin 18)
 int currentSpeed = 0;
 int currentTurn = 0;
 boolean droidMoving = false;
+
+// ---------------------------------------------------------------------------------------
+//    Used for Sonars
+// ---------------------------------------------------------------------------------------
+NewPing frontSonar = NewPing(34, 35); //trig on 34, echo on 35
+NewPing leftFrontSonar = NewPing(46, 47); 
+NewPing backSonar = NewPing(40, 41); 
+//NewPing leftBackSonar = NewPing(,);
+
+ boolean autoMode = false;
+ int sonarReadCycle = 1; //can't ping every sonar every cycle, so only calculate one per cycle, identify which sonar with this?
+ long sonarIntervalTimer = millis();
+ int sonarIntervalTime = 300;
+ int currentFrontDistance = 0; //distance in centimeters
+ int currentLeftFrontDistance = 0;
+ int currentBackDistance = 0;
+ int currentLeftBackDistance = 0;
+ int tapeDistance = 0; //distance from tape to wall, will need to detect
+ 
 // =======================================================================================
 //                                 Main Program
 // =======================================================================================
@@ -189,6 +208,15 @@ void loop()
        // ----------------------------------------------
     
        // Sample droid function call from PS3 request - REMOVE ONCE YOU UNDERSTAND STRUCTURE
+       if (reqCross) {
+          if (autoMode == true) {
+            autoMode = false;
+          } else {
+            autoMode = true;
+            sonarIntervalTimer = millis();
+          }
+       }
+       if (autoMode == false) {
        if (reqArrowUp) {
           callMyArrowUpFunction();
        }
@@ -213,6 +241,12 @@ void loop()
        }
 
        moveDroid();
+       }
+
+       if (autoMode == true) {
+        takeSonarReadings();
+        Serial.println(currentFrontDistance);
+       }
         
        // ----------------------------------------------
        // YOUR MAIN LOOP CONTROL CODE SHOULD END HERE
@@ -267,6 +301,13 @@ long M3D3Min(long a, long b) {
     return b;
 }
 
+long M3D3Abs(long a) {
+  if (a < 0) {
+    return -1 * a;
+  }
+  return a;
+}
+
 void callMyArrowUpFunction()
 {
     Serial.println("Droid is now executing my custom ARROW UP function");
@@ -299,7 +340,7 @@ void moveServoByJoystick() {
 void moveDroid() { //not finished, but a start
   if (reqLeftJoyMade) {
     currentSpeed = M3D3Max(M3D3Min(currentSpeed + 1, reqLeftJoyYValue), currentSpeed - 1);
-    currentTurn = reqLeftJoyXValue/M3D3Max(1, M3D3Max(currentSpeed, currentSpeed * -1)/5);
+    currentTurn = M3D3Min(160 - M3D3Abs(currentSpeed), M3D3Max(-1 * (160 - M3D3Abs(currentSpeed)), reqLeftJoyXValue));
     ST->turn(currentTurn);
     ST->drive(currentSpeed);
     if (!droidMoving) {
@@ -308,7 +349,7 @@ void moveDroid() { //not finished, but a start
   } else {
     if (droidMoving) {
       currentSpeed = M3D3Min(M3D3Max(currentSpeed - 1, 0), currentSpeed + 1);
-      currentTurn = M3D3Max(currentTurn - 1, 0);
+      currentTurn = 0;
       if (currentSpeed) {
         ST->turn(currentTurn);
         ST->drive(currentSpeed);
@@ -320,6 +361,18 @@ void moveDroid() { //not finished, but a start
       }
     }
   }
+}
+
+void takeSonarReadings() {
+  if ((sonarIntervalTimer + sonarIntervalTime) > millis()) {
+    return;
+} else {
+  sonarIntervalTimer = millis();
+}
+
+if (sonarReadCycle == 1) {
+  currentFrontDistance = frontSonar.convert_cm(frontSonar.ping_median(5));
+}
 }
 
 // =======================================================================================
