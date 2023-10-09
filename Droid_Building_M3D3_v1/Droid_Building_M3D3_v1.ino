@@ -340,6 +340,7 @@ void moveServoByJoystick() {
 void moveDroid() { //not finished, but a start
   if (reqLeftJoyMade) {
     currentSpeed = M3D3Max(M3D3Min(currentSpeed + 1, reqLeftJoyYValue), currentSpeed - 1);
+
     currentTurn = M3D3Min(160 - M3D3Abs(currentSpeed), M3D3Max(-1 * (160 - M3D3Abs(currentSpeed)), reqLeftJoyXValue));
     ST->turn(currentTurn);
     ST->drive(currentSpeed);
