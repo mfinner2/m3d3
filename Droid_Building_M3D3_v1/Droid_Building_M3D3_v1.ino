@@ -39,7 +39,7 @@ uint32_t lastMsgTime = 0;
 uint32_t currentTime = 0;
 uint32_t lastLoopTime = 0;
 int badPS3Data = 0;
-byte joystickDeadZoneRange = 40;
+byte joystickDeadZoneRange = 15;
 
 boolean isPS3ControllerInitialized = false;
 boolean mainControllerConnected = false;
@@ -122,20 +122,25 @@ boolean droidMoving = false;
 // ---------------------------------------------------------------------------------------
 //    Used for Sonars
 // ---------------------------------------------------------------------------------------
-NewPing frontSonar = NewPing(34, 35); //trig on 34, echo on 35
-NewPing leftFrontSonar = NewPing(46, 47); 
-NewPing backSonar = NewPing(40, 41); 
-//NewPing leftBackSonar = NewPing(,);
+NewPing frontSonar = NewPing(40, 41); //trig on 34, echo on 35
+NewPing leftFrontSonar = NewPing(38, 39); 
+NewPing backSonar = NewPing(34, 35); 
+NewPing leftBackSonar = NewPing(36, 37);
 
  boolean autoMode = false;
- int sonarReadCycle = 1; //can't ping every sonar every cycle, so only calculate one per cycle, identify which sonar with this?
+ int sonarReadCycle = 0; //can't ping every sonar every cycle, so only calculate one per cycle, identify which sonar with this?
  long sonarIntervalTimer = millis();
  int sonarIntervalTime = 300;
- int currentFrontDistance = 0; //distance in centimeters
- int currentLeftFrontDistance = 0;
- int currentBackDistance = 0;
- int currentLeftBackDistance = 0;
- int tapeDistance = 0; //distance from tape to wall, will need to detect
+ int currentFrontDistance = -1; //distance in centimeters
+ int currentLeftFrontDistance = -1;
+ int currentBackDistance = -1;
+ int currentLeftBackDistance = -1;
+ int tapeDistanceFront = -1; //distance from tape to wall, will need to detect
+ int tapeDistanceBack = -1; //distance from tape to wall, will need to detect
+ int autonCounter = 0;
+ boolean autonSetFinished = false;
+ int autonSwerveVal = 0;
+ long turnTimer = millis();
  
 // =======================================================================================
 //                                 Main Program
@@ -214,6 +219,14 @@ void loop()
           } else {
             autoMode = true;
             sonarIntervalTimer = millis();
+            currentFrontDistance = -1; //distance in centimeters
+            currentLeftFrontDistance = -1;
+            currentBackDistance = -1;
+            currentLeftBackDistance = -1;
+            tapeDistanceFront = -1;
+            tapeDistanceBack = -1;
+            autonCounter = 0;
+            autonSetFinished = false;
           }
        }
        if (autoMode == false) {
@@ -245,7 +258,57 @@ void loop()
 
        if (autoMode == true) {
         takeSonarReadings();
-        Serial.println(currentFrontDistance);
+        Serial.print("Front: ");
+          Serial.println(currentFrontDistance);
+          Serial.print("Left Front: ");
+          Serial.println(currentLeftFrontDistance);
+          Serial.print("Left Back: ");
+          Serial.println(currentLeftBackDistance);
+          Serial.print("Back: ");
+          Serial.println(currentBackDistance);
+        if (!(tapeDistanceFront == -1 || tapeDistanceBack == -1)) {
+        if (autonCounter == 0 || autonCounter == 2 || autonCounter == 4 || autonCounter == 6) {
+           moveForward();
+        } else if (autonCounter == 1) {
+          turnRight();
+        }
+        if (autonSetFinished) {
+          stopDrive();
+          autonCounter++;
+          turnTimer = millis();
+          autonSetFinished = false;
+        }
+        /*
+          Serial.print("Front: ");
+          Serial.println(currentFrontDistance);
+          Serial.print("Left Front: ");
+          Serial.println(currentLeftFrontDistance);
+          Serial.print("Left Back: ");
+          Serial.println(currentLeftBackDistance);
+          Serial.print("Back: ");
+          Serial.println(currentBackDistance);
+          if (autonSetFinished) {
+            stopDrive();
+            autonCounter++;
+            turnTimer = millis();
+          }
+          if (autonCounter == 0 || autonCounter == 2 || autonCounter == 4 || autonCounter == 6) {
+            moveForward();
+          }
+          if (autonCounter == 1 || autonCounter == 3 || autonCounter == 5) {
+            turnRight();
+          }
+          if (autonCounter == 7 || autonCounter == 9 || autonCounter == 11 || autonCounter == 13) {
+            moveBackward();
+          }
+          if (autonCounter == 8 || autonCounter == 10 || autonCounter == 12) {
+            turnRightBackward();
+          } */
+        } else {
+          tapeDistanceFront = currentLeftFrontDistance;
+          tapeDistanceBack = currentLeftBackDistance;
+        }
+        //front should be about 2 less than dist from left before turn
        }
         
        // ----------------------------------------------
@@ -308,6 +371,12 @@ long M3D3Abs(long a) {
   return a;
 }
 
+int sign(int a) {
+  if (a < 0) {
+     return -1;
+  }
+  return 1;
+}
 void callMyArrowUpFunction()
 {
     Serial.println("Droid is now executing my custom ARROW UP function");
@@ -338,10 +407,9 @@ void moveServoByJoystick() {
 }
 
 void moveDroid() { //not finished, but a start
-  if (reqLeftJoyMade) {
-    currentSpeed = M3D3Max(M3D3Min(currentSpeed + 1, reqLeftJoyYValue), currentSpeed - 1);
-
-    currentTurn = M3D3Min(160 - M3D3Abs(currentSpeed), M3D3Max(-1 * (160 - M3D3Abs(currentSpeed)), reqLeftJoyXValue));
+  if (reqLeftJoyMade || reqRightJoyMade) {
+    currentSpeed = M3D3Max(M3D3Min(currentSpeed + 1, reqLeftJoyYValue * 2 / 3), currentSpeed - 1);
+    currentTurn = M3D3Min(160 - M3D3Abs(currentSpeed), M3D3Max(-1 * (160 - M3D3Abs(currentSpeed)), reqRightJoyXValue/3));
     ST->turn(currentTurn);
     ST->drive(currentSpeed);
     if (!droidMoving) {
@@ -371,9 +439,55 @@ void takeSonarReadings() {
   sonarIntervalTimer = millis();
 }
 
-if (sonarReadCycle == 1) {
+if (sonarReadCycle == 0) {
   currentFrontDistance = frontSonar.convert_cm(frontSonar.ping_median(5));
+} else if (sonarReadCycle == 1) {
+  currentLeftFrontDistance = leftFrontSonar.convert_cm(leftFrontSonar.ping_median(5));
+} else if (sonarReadCycle == 2) {
+  currentLeftBackDistance = leftBackSonar.convert_cm(leftBackSonar.ping_median(5));
+} else if (sonarReadCycle == 3) {
+  currentBackDistance = backSonar.convert_cm(backSonar.ping_median(5));
 }
+sonarReadCycle = (sonarReadCycle + 1) % 4;
+}
+
+void moveForward() {
+  if (currentFrontDistance - ((tapeDistanceFront + tapeDistanceBack)/2) > 3) {
+    autonSwerveVal = 0;
+    if (tapeDistanceFront < currentLeftFrontDistance) {
+      autonSwerveVal -= 4;
+    }
+    if (tapeDistanceFront > currentLeftFrontDistance) {
+      autonSwerveVal += 4;
+    }
+    ST->turn(autonSwerveVal);
+    ST->drive(-50);
+  } else {
+    autonSetFinished = true;
+  }
+  
+}
+
+void turnRight() {
+  if ((turnTimer + 750) > millis()) { //bumped up since it might be catching the wall at the last second
+    ST->turn(60);
+    ST->drive(0);
+  } else {
+    autonSetFinished = true;
+  }
+  
+}
+
+void moveBackward() {
+  
+}
+
+void turnRightBackward() {
+  
+}
+
+void stopDrive() {
+  ST->stop();
 }
 
 // =======================================================================================
