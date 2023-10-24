@@ -141,7 +141,15 @@ NewPing leftBackSonar = NewPing(36, 37);
  boolean autonSetFinished = false;
  int autonSwerveVal = 0;
  long turnTimer = millis();
- 
+
+ // ---------------------------------------------------------------------------------------
+//    Used for Sound
+// ---------------------------------------------------------------------------------------
+ MP3Trigger myMP3Trigger;
+ typedef enum {none, rattlingCans1, rattlingCans2, bottlesClacking, _, _, lidClosing}sounds; //add comma and additional sounds as created, need to be in same order as numbering in sd card (leave none in)
+ long soundTimer = millis();
+ int soundInterval = -1;
+
 // =======================================================================================
 //                                 Main Program
 // =======================================================================================
@@ -178,6 +186,12 @@ void setup()
    //Servo
    myServo.attach(9);
    myServo.write(servoPosition);
+
+   //Sound
+   myMP3Trigger.setup(&Serial2);
+   Serial2.begin(MP3Trigger::serialRate());
+   randomSeed(analogRead(0)); //note: change if anything gets connected to pin 0
+   soundInterval = random(1000, 5000);
 
    //Motor Control
    Serial1.begin(9600);
@@ -310,6 +324,12 @@ void loop()
         }
         //front should be about 2 less than dist from left before turn
        }
+
+       if (!droidMoving && !autoMode) {
+        ambientNoise();
+       }
+
+       myMP3Trigger.update();
         
        // ----------------------------------------------
        // YOUR MAIN LOOP CONTROL CODE SHOULD END HERE
@@ -488,6 +508,16 @@ void turnRightBackward() {
 
 void stopDrive() {
   ST->stop();
+}
+
+void ambientNoise() {
+  if (soundTimer + soundInterval > millis()) {
+    //randomize track
+    int track = random(1, 5);
+    myMP3Trigger.trigger(track /*+ offset*/);
+    soundTimer = millis();
+    soundInterval = random(1000, 5000);
+  }
 }
 
 // =======================================================================================
