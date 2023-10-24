@@ -146,7 +146,7 @@ NewPing leftBackSonar = NewPing(36, 37);
 //    Used for Sound
 // ---------------------------------------------------------------------------------------
  MP3Trigger myMP3Trigger;
- typedef enum {none, rattlingCans1, rattlingCans2, bottlesClacking, _, _, lidClosing}sounds; //add comma and additional sounds as created, need to be in same order as numbering in sd card (leave none in)
+ typedef enum {none, rattlingCans1, rattlingCans2, rattlingCans3, rattlingCans4, _, lidClosing}sounds; //add comma and additional sounds as created, need to be in same order as numbering in sd card (leave none in)
  long soundTimer = millis();
  int soundInterval = -1;
 
