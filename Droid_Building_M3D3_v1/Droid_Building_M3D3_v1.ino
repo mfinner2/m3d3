@@ -146,9 +146,29 @@ NewPing leftBackSonar = NewPing(36, 37);
 //    Used for Sound
 // ---------------------------------------------------------------------------------------
  MP3Trigger myMP3Trigger;
- typedef enum {none, rattlingCans1, rattlingCans2, rattlingCans3, rattlingCans4, _, lidClosing}sounds; //add comma and additional sounds as created, need to be in same order as numbering in sd card (leave none in)
+
+ typedef struct {
+  char soundName[20];
+  long millisecs;
+ }Sound;
+
+ Sound soundsArray[7];
+// typedef enum {none, rattlingCans1, rattlingCans2, rattlingCans3, rattlingCans4, rattlingCans5, lidClosing}sounds; //add comma and additional sounds as created, need to be in same order as numbering in sd card (leave none in)
  long soundTimer = millis();
  int soundInterval = -1;
+ int track = 0;
+
+ bool changeTrack = false;
+
+
+ // ---------------------------------------------------------------------------------------
+//    Used for OLED
+// ---------------------------------------------------------------------------------------
+
+#define SCREEN_WIDTH 128 
+#define SCREEN_HEIGHT 64 
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
 
 // =======================================================================================
 //                                 Main Program
@@ -193,12 +213,35 @@ void setup()
    randomSeed(analogRead(0)); //note: change if anything gets connected to pin 0
    soundInterval = random(1000, 5000);
 
+   strcpy(soundsArray[0].soundName, " ");
+   soundsArray[0].millisecs = 0;
+   strcpy(soundsArray[1].soundName, "Rattling Cans");
+   soundsArray[1].millisecs = 1500;
+   strcpy(soundsArray[2].soundName, "Shifting Cans");
+   soundsArray[2].millisecs = 1300;
+   strcpy(soundsArray[3].soundName, "Throw Pastic");
+   soundsArray[3].millisecs = 1200;
+   strcpy(soundsArray[4].soundName, "Crumple");
+   soundsArray[4].millisecs = 1000;
+   strcpy(soundsArray[5].soundName, "Glass Bottle");
+   soundsArray[5].millisecs = 1000;
+   strcpy(soundsArray[6].soundName, "Bin Closing");
+   soundsArray[6].millisecs = 1000;
+
    //Motor Control
    Serial1.begin(9600);
    ST->autobaud();
    ST->setTimeout(200); //if contact is lost, stop (must speak to 5 times a second)
    ST->setDeadband(driveDeadBandRange);
 
+   // OLED
+   display.begin(SSD1306_SWITCHCAPVCC, 0X3C);
+   display.display();
+   delay(2000);
+   display.setTextSize(1);
+   display.setTextColor(WHITE);
+   display.clearDisplay();
+   display.display();
 
    // ----------------------------------------------
    // YOUR SETUP CONTROL CODE SHOULD END HERE
@@ -325,9 +368,11 @@ void loop()
         //front should be about 2 less than dist from left before turn
        }
 
-       if (!droidMoving && !autoMode) {
         ambientNoise();
-       }
+
+        if (changeTrack) {
+          displaySound();
+        }
 
        myMP3Trigger.update();
         
@@ -412,13 +457,13 @@ void callMyArrowDownFunction()
 }
 
 void moveServoByJoystick() {
-  if (reqLeftJoyLeft && servoPosition >= 7 && ((servoTimer + 1000) > millis())) {
+  if (reqLeftJoyLeft && servoPosition >= 7 && ((servoTimer + 1000) < millis())) {
     servoPosition = servoPosition - 2;
     myServo.write(servoPosition);
     servoTimer = millis();
     Serial.println(servoPosition);
   }
-  if (reqLeftJoyRight && servoPosition <= 168 && ((servoTimer + 1000) > millis())) {
+  if (reqLeftJoyRight && servoPosition <= 168 && ((servoTimer + 1000) < millis())) {
     servoPosition = servoPosition + 2;
     myServo.write(servoPosition);
     servoTimer = millis();
@@ -453,7 +498,7 @@ void moveDroid() { //not finished, but a start
 }
 
 void takeSonarReadings() {
-  if ((sonarIntervalTimer + sonarIntervalTime) > millis()) {
+  if ((sonarIntervalTimer + sonarIntervalTime) < millis()) {
     return;
 } else {
   sonarIntervalTimer = millis();
@@ -511,13 +556,29 @@ void stopDrive() {
 }
 
 void ambientNoise() {
-  if (soundTimer + soundInterval > millis()) {
+  if (track != 0 && soundTimer + soundsArray[track].millisecs < millis()) {
+    changeTrack = true;
+    track = 0;
+  }
+  if (soundTimer + soundInterval < millis()) {
     //randomize track
-    int track = random(1, 5);
+    changeTrack = true;
+    track = random(1, 6);
+    myMP3Trigger.setVolume(50);
     myMP3Trigger.trigger(track /*+ offset*/);
     soundTimer = millis();
-    soundInterval = random(1000, 5000);
+    soundInterval = random(1000, 5000) + soundsArray[track].millisecs;
+    
   }
+}
+
+void displaySound(){
+  changeTrack = false;
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.println(soundsArray[track].soundName);
+  display.println(" ");
+  display.display();
 }
 
 // =======================================================================================
