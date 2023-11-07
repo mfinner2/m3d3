@@ -152,13 +152,14 @@ NewPing leftBackSonar = NewPing(36, 37);
   long millisecs;
  }Sound;
 
- Sound soundsArray[7];
-// typedef enum {none, rattlingCans1, rattlingCans2, rattlingCans3, rattlingCans4, rattlingCans5, lidClosing}sounds; //add comma and additional sounds as created, need to be in same order as numbering in sd card (leave none in)
+ Sound soundsArray[8];
  long soundTimer = millis();
  int soundInterval = -1;
  int track = 0;
 
  bool changeTrack = false;
+
+ bool ambientPlaying = true;
 
 
  // ---------------------------------------------------------------------------------------
@@ -225,8 +226,10 @@ void setup()
    soundsArray[4].millisecs = 1000;
    strcpy(soundsArray[5].soundName, "Glass Bottle");
    soundsArray[5].millisecs = 1000;
-   strcpy(soundsArray[6].soundName, "Bin Closing");
-   soundsArray[6].millisecs = 1000;
+   strcpy(soundsArray[6].soundName, "Rolling");
+   soundsArray[6].millisecs = 680;
+   strcpy(soundsArray[7].soundName, "Bin Close");
+   soundsArray[7].millisecs = 1000;
 
    //Motor Control
    Serial1.begin(9600);
@@ -288,26 +291,11 @@ void loop()
        }
        if (autoMode == false) {
        if (reqArrowUp) {
-          callMyArrowUpFunction();
+          servoUp();
        }
 
        if (reqArrowDown) {
-          callMyArrowDownFunction();
-       }
-
-       if (reqLeftJoyLeft || reqLeftJoyRight) {
-          Serial.println("Left Joystick Moving");
-          if (!servoMoving) {
-            servoTimer = millis();
-            servoMoving = true;
-            Serial.println("Servo Millis Reset");
-          }
-          moveServoByJoystick();
-       } else {
-          if (servoMoving) {
-            servoMoving = false;
-            Serial.println("Servo Moving Set to false");
-          }
+          servoDown();
        }
 
        moveDroid();
@@ -368,7 +356,27 @@ void loop()
         //front should be about 2 less than dist from left before turn
        }
 
-        ambientNoise();
+       
+
+       if (droidMoving && ambientPlaying) {
+          ambientPlaying = false;
+          soundInterval = 0;
+          movementSound(); 
+          changeTrack = true;
+        }
+
+        if (droidMoving) {
+          movementSound();
+        }
+
+        if (!droidMoving && !ambientPlaying) {
+          ambientPlaying = true;
+          soundInterval = 0;
+        }
+
+        if (ambientPlaying) {
+          ambientNoise();
+        }
 
         if (changeTrack) {
           displaySound();
@@ -442,18 +450,18 @@ int sign(int a) {
   }
   return 1;
 }
-void callMyArrowUpFunction()
+void servoUp()
 {
-    Serial.println("Droid is now executing my custom ARROW UP function");
+    //Serial.println("Droid is now executing my custom ARROW UP function");
     myServo.write(5);
     servoPosition = 5;
 }
 
-void callMyArrowDownFunction()
+void servoDown()
 {
-    Serial.println("Droid is now executing my custom ARROW DOWN function");
-    myServo.write(170);
-    servoPosition = 170;
+    //Serial.println("Droid is now executing my custom ARROW DOWN function");
+    myServo.write(90);
+    servoPosition = 90;
 }
 
 void moveServoByJoystick() {
@@ -556,10 +564,12 @@ void stopDrive() {
 }
 
 void ambientNoise() {
+  
   if (track != 0 && soundTimer + soundsArray[track].millisecs < millis()) {
     changeTrack = true;
     track = 0;
   }
+  
   if (soundTimer + soundInterval < millis()) {
     //randomize track
     changeTrack = true;
@@ -579,6 +589,17 @@ void displaySound(){
   display.println(soundsArray[track].soundName);
   display.println(" ");
   display.display();
+}
+
+void movementSound() {
+  myMP3Trigger.setVolume(map(M3D3Max(M3D3Abs(currentSpeed), M3D3Abs(currentTurn)), 0, 85, 70, 1));
+  if (soundTimer + soundInterval < millis()) {
+    track = 6;
+    myMP3Trigger.trigger(track /*+ offset*/);
+    soundTimer = millis();
+    soundInterval = soundsArray[track].millisecs;
+    
+  }
 }
 
 // =======================================================================================
