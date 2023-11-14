@@ -162,13 +162,29 @@ NewPing leftBackSonar = NewPing(36, 37);
  bool ambientPlaying = true;
 
 
- // ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
 //    Used for OLED
 // ---------------------------------------------------------------------------------------
 
 #define SCREEN_WIDTH 128 
 #define SCREEN_HEIGHT 64 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// ---------------------------------------------------------------------------------------
+//    Used for LEDs
+// ---------------------------------------------------------------------------------------
+#define CLOCK 5
+#define DATA 4
+#define LATCH 6
+Adafruit_TLC5947 LEDControl = Adafruit_TLC5947(1, CLOCK, DATA, LATCH);
+int ledMaxBright = 4000; //technically 4095, can go down to 0
+const int numLEDs = 6;
+
+int ambient1[numLEDs];
+int ambient2[numLEDs];
+int ambient3[numLEDs];
+int ambient4[numLEDs];
+int ambient5[numLEDs];
 
 
 // =======================================================================================
@@ -245,6 +261,22 @@ void setup()
    display.setTextColor(WHITE);
    display.clearDisplay();
    display.display();
+
+   //LEDs
+   LEDControl.begin();
+   for (int i = 0; i < numLEDs; i++) {
+    LEDControl.setPWM(i, 0);
+   }
+   LEDControl.write();
+
+    for (int i = 0; i < numLEDs; i++) {
+      ambient1[i] = (i % 2 == 0) ? ledMaxBright : 0;
+      ambient2[i] = (i % 3 == 1) ? ledMaxBright : ((i % 3 == 2) ? ledMaxBright/2 : 0);
+      ambient3[i] = (i % 3 == 2) ? ledMaxBright : 0;
+      ambient4[i] = (i % 3 == 0) ? ledMaxBright : ((i % 2 == 0) ? ledMaxBright/3 : 0);
+      ambient5[i] = (i % 2 == 1) ? ledMaxBright : 0;
+    }
+   
 
    // ----------------------------------------------
    // YOUR SETUP CONTROL CODE SHOULD END HERE
@@ -578,8 +610,36 @@ void ambientNoise() {
     myMP3Trigger.trigger(track /*+ offset*/);
     soundTimer = millis();
     soundInterval = random(1000, 5000) + soundsArray[track].millisecs;
+    ambientLights();
     
   }
+}
+
+void ambientLights() {
+  if (track == 1) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, ambient1[i]);
+    }
+  } else if (track == 2) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, ambient2[i]);
+    }
+  } else if (track == 3) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, ambient3[i]);
+    }
+  } else if (track == 4) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, ambient4[i]);
+    }
+  } else if (track == 5) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, ambient5[i]);
+    }
+  }
+
+  LEDControl.write();
+  
 }
 
 void displaySound(){
