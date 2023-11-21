@@ -181,6 +181,11 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 Adafruit_TLC5947 LEDControl = Adafruit_TLC5947(1, CLOCK, DATA, LATCH);
 int ledMaxBright = 4000; //technically 4095, can go down to 0
 const int numLEDs = 6;
+int numLidLEDsGreen = 4;
+int numLidLEDsRed = 2;
+
+int lidLEDsGreenOffset = numLEDs;
+int lidLEDsRedOffset = numLEDs + numLidLEDsGreen;
 
 int ambient1[numLEDs];
 int ambient2[numLEDs];
@@ -264,9 +269,9 @@ void setup()
    strcpy(soundsArray[6].soundName, "Rolling");
    soundsArray[6].millisecs = 680;
    strcpy(soundsArray[7].soundName, "Bin Close");
-   soundsArray[7].millisecs = 1000;
+   soundsArray[7].millisecs = 3000;
    strcpy(soundsArray[8].soundName, "Bin Open");
-   soundsArray[8].millisecs = 1000;
+   soundsArray[8].millisecs = 3000;
    strcpy(soundsArray[9].soundName, "Baby Shark");
    soundsArray[9].millisecs = 10000;
    strcpy(soundsArray[10].soundName, "Uptown Funk");
@@ -291,7 +296,7 @@ void setup()
 
    //LEDs
    LEDControl.begin();
-   for (int i = 0; i < numLEDs; i++) {
+   for (int i = 0; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
     LEDControl.setPWM(i, 0);
    }
    LEDControl.write();
@@ -558,6 +563,7 @@ void servoUp()
     changeTrack = true;
     force = false;
     servoMoving = true;
+    lidUpLights();
     }
     servoTimer = millis();
 
@@ -577,23 +583,33 @@ void servoDown()
     soundInterval = soundsArray[track].millisecs;
     force = false;
     servoMoving = true;
+    lidDownLights();
     }
 }
 
-/*void moveServoByJoystick() {
-  if (reqLeftJoyLeft && servoPosition >= 7 && ((servoTimer + 1000) < millis())) {
-    servoPosition = servoPosition - 2;
-    myServo.write(servoPosition);
-    servoTimer = millis();
-    Serial.println(servoPosition);
+void lidUpLights() {
+  for (int i = 0; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
+    if (i >= lidLEDsGreenOffset && i < lidLEDsGreenOffset + numLidLEDsGreen) {
+      LEDControl.setPWM(i, ledMaxBright);
+    } else {
+      LEDControl.setPWM(i, 0);
+    }
   }
-  if (reqLeftJoyRight && servoPosition <= 168 && ((servoTimer + 1000) < millis())) {
-    servoPosition = servoPosition + 2;
-    myServo.write(servoPosition);
-    servoTimer = millis();
-    Serial.println(servoPosition);
+
+  LEDControl.write();
+}
+
+void lidDownLights() {
+  for (int i = 0; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
+    if (i >= lidLEDsRedOffset && i < lidLEDsRedOffset + numLidLEDsRed) {
+      LEDControl.setPWM(i, ledMaxBright);
+    } else {
+      LEDControl.setPWM(i, 0);
+    }
   }
-}*/
+
+  LEDControl.write();
+}
 
 void moveDroid() { //not finished, but a start
   if (reqLeftJoyMade || reqRightJoyMade) {
@@ -686,14 +702,14 @@ void ambientNoise() {
     track = 0;
   }
   
-  if (soundTimer + soundInterval < millis()) {
+  if (soundTimer + soundInterval + soundsArray[track].millisecs < millis()) {
     //randomize track
     changeTrack = true;
     track = random(1, 6);
     myMP3Trigger.setVolume(50);
     myMP3Trigger.trigger(track /*+ offset*/);
     soundTimer = millis();
-    soundInterval = random(1000, 5000) + soundsArray[track].millisecs;
+    soundInterval = random(1000, 5000);
     ambientLights();
     
   }
@@ -720,6 +736,10 @@ void ambientLights() {
     for (int i = 0; i < numLEDs; i++) {
       LEDControl.setPWM(i, ambient5[i]);
     }
+  }
+
+  for (int i = numLEDs; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
+    LEDControl.setPWM(i, 0);
   }
 
   LEDControl.write();
@@ -765,6 +785,7 @@ void routineServoUp()
     servoMoving = true;
     lidTime = servoInterval;
     routineServoTimer = millis();
+    lidUpLights();
     }
 
 }
@@ -782,6 +803,7 @@ void routineServoDown()
     changeTrack = true;
     soundInterval = soundsArray[track].millisecs;
     servoMoving = true;
+    lidDownLights();
     }
 }
 
