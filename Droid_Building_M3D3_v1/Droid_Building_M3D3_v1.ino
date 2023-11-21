@@ -105,9 +105,11 @@ boolean blinkOn = false;
 //    Used for Servo
 // ---------------------------------------------------------------------------------------
 Servo myServo;
-long servoTimer = millis();
 boolean servoMoving = false;
 int servoPosition = 90;
+boolean force = false;
+long servoTimer = millis();
+ int servoInterval = 4500;
 
 // ---------------------------------------------------------------------------------------
 //    Used for Motor Controller
@@ -152,7 +154,7 @@ NewPing leftBackSonar = NewPing(36, 37);
   long millisecs;
  }Sound;
 
- Sound soundsArray[8];
+ Sound soundsArray[12];
  long soundTimer = millis();
  int soundInterval = -1;
  int track = 0;
@@ -186,6 +188,23 @@ int ambient3[numLEDs];
 int ambient4[numLEDs];
 int ambient5[numLEDs];
 
+// ---------------------------------------------------------------------------------------
+//    Used for Infrared
+// ---------------------------------------------------------------------------------------
+int infraredPin = 10;
+boolean infraredValue;
+
+// ---------------------------------------------------------------------------------------
+//    Used with Routines
+// ---------------------------------------------------------------------------------------
+boolean inRoutine1 = false;
+int routine1Stage = -1;
+boolean routineStageFinished = true;
+long lidTime = 0;
+boolean routineServoIsUp = false;
+long forBackTimer = millis();
+long genTurnTimer = millis();
+long routineServoTimer = millis();
 
 // =======================================================================================
 //                                 Main Program
@@ -246,6 +265,14 @@ void setup()
    soundsArray[6].millisecs = 680;
    strcpy(soundsArray[7].soundName, "Bin Close");
    soundsArray[7].millisecs = 1000;
+   strcpy(soundsArray[8].soundName, "Bin Open");
+   soundsArray[8].millisecs = 1000;
+   strcpy(soundsArray[9].soundName, "Baby Shark");
+   soundsArray[9].millisecs = 10000;
+   strcpy(soundsArray[10].soundName, "Uptown Funk");
+   soundsArray[10].millisecs = 10000;
+   strcpy(soundsArray[11].soundName, "Christmas");
+   soundsArray[11].millisecs = 10000;
 
    //Motor Control
    Serial1.begin(9600);
@@ -276,7 +303,9 @@ void setup()
       ambient4[i] = (i % 3 == 0) ? ledMaxBright : ((i % 2 == 0) ? ledMaxBright/3 : 0);
       ambient5[i] = (i % 2 == 1) ? ledMaxBright : 0;
     }
-   
+
+   //Infrared
+   pinMode(10, INPUT);
 
    // ----------------------------------------------
    // YOUR SETUP CONTROL CODE SHOULD END HERE
@@ -323,10 +352,12 @@ void loop()
        }
        if (autoMode == false) {
        if (reqArrowUp) {
+          force = true;
           servoUp();
        }
 
        if (reqArrowDown) {
+          force = true;
           servoDown();
        }
 
@@ -388,8 +419,18 @@ void loop()
         //front should be about 2 less than dist from left before turn
        }
 
-       
+       if (reqCircle) {
+        inRoutine1 = true;
+        routine1Stage = -1;
+        routineStageFinished = true;
+       }
 
+       if (inRoutine1) {
+        routine1();
+       }
+
+       
+       if (!inRoutine1) {
        if (droidMoving && ambientPlaying) {
           ambientPlaying = false;
           soundInterval = 0;
@@ -406,6 +447,24 @@ void loop()
           soundInterval = 0;
         }
 
+        readInfrared();
+
+        if (!infraredValue) {
+          servoUp();
+        }
+
+        servoDown();
+
+        if (!servoMoving && !droidMoving) {
+          ambientPlaying = true;
+        }
+
+        if (servoMoving && ambientPlaying) {
+          ambientPlaying = false;
+        }
+
+        servoMoving = false;
+
         if (ambientPlaying) {
           ambientNoise();
         }
@@ -413,6 +472,9 @@ void loop()
         if (changeTrack) {
           displaySound();
         }
+       }
+
+        
 
        myMP3Trigger.update();
         
@@ -485,18 +547,40 @@ int sign(int a) {
 void servoUp()
 {
     //Serial.println("Droid is now executing my custom ARROW UP function");
+    if (force || servoPosition != 5) {
     myServo.write(5);
     servoPosition = 5;
+    track = 8;
+    myMP3Trigger.setVolume(50);
+    myMP3Trigger.trigger(track);
+    soundTimer = millis();
+    soundInterval = soundsArray[track].millisecs;
+    changeTrack = true;
+    force = false;
+    servoMoving = true;
+    }
+    servoTimer = millis();
+
 }
 
 void servoDown()
 {
     //Serial.println("Droid is now executing my custom ARROW DOWN function");
+    if (force || (servoTimer + servoInterval < millis() && servoPosition != 90)) {
     myServo.write(90);
     servoPosition = 90;
+    track = 7;
+    myMP3Trigger.setVolume(50);
+    myMP3Trigger.trigger(track);
+    soundTimer = millis();
+    changeTrack = true;
+    soundInterval = soundsArray[track].millisecs;
+    force = false;
+    servoMoving = true;
+    }
 }
 
-void moveServoByJoystick() {
+/*void moveServoByJoystick() {
   if (reqLeftJoyLeft && servoPosition >= 7 && ((servoTimer + 1000) < millis())) {
     servoPosition = servoPosition - 2;
     myServo.write(servoPosition);
@@ -509,7 +593,7 @@ void moveServoByJoystick() {
     servoTimer = millis();
     Serial.println(servoPosition);
   }
-}
+}*/
 
 void moveDroid() { //not finished, but a start
   if (reqLeftJoyMade || reqRightJoyMade) {
@@ -660,6 +744,131 @@ void movementSound() {
     soundInterval = soundsArray[track].millisecs;
     
   }
+}
+
+void readInfrared() {
+  infraredValue = digitalRead(infraredPin);
+}
+
+void routineServoUp()
+{
+    if (servoPosition != 5) {
+    myServo.write(5);
+    servoPosition = 5;
+    routineServoIsUp = true;
+    track = 8;
+    myMP3Trigger.setVolume(50);
+    myMP3Trigger.trigger(track);
+    soundTimer = millis();
+    soundInterval = soundsArray[track].millisecs;
+    changeTrack = true;
+    servoMoving = true;
+    lidTime = servoInterval;
+    routineServoTimer = millis();
+    }
+
+}
+
+void routineServoDown()
+{
+    if (routineServoTimer + servoInterval < millis() && servoPosition != 90) {
+    myServo.write(90);
+    servoPosition = 90;
+    routineServoIsUp = false;
+    track = 7;
+    myMP3Trigger.setVolume(50);
+    myMP3Trigger.trigger(track);
+    soundTimer = millis();
+    changeTrack = true;
+    soundInterval = soundsArray[track].millisecs;
+    servoMoving = true;
+    }
+}
+
+void moveForBack(int vel, int dist) {
+  if ((forBackTimer + lidTime + dist) > millis()) {
+    ST->turn(0);
+    ST->drive(vel);
+  } else {
+    routineStageFinished = true;
+  }
+}
+
+void turnGen(int dir, int degree) {
+  if ((genTurnTimer + lidTime + degree) > millis()) {
+    ST->turn(dir * 30);
+    ST->drive(0);
+  } else {
+    routineStageFinished = true;
+  }
+  
+}
+
+void routine1() {
+  //meander around, intend wave to activate infrared and lid
+  //when lid is opened, green light; when lid closes, red light (then turn off)
+
+  //start in center
+  if (routineStageFinished) {
+    routineStageFinished = false;
+    routine1Stage++;
+    forBackTimer = millis();
+    genTurnTimer = millis();
+    lidTime = 0;
+  }
+
+  readInfrared();
+  if (!infraredValue) {
+    routineServoUp();
+  }
+  routineServoDown();
+
+  if (!routineServoIsUp) {
+  if (routine1Stage == 0) {
+    moveForBack(-25, 3000);
+  } else if (routine1Stage == 1) {
+    turnGen(1, 1800);
+  } else if (routine1Stage == 2) {
+    moveForBack(-25, 2000);
+  } else if (routine1Stage == 3) {
+    turnGen(-1, 1500);
+  } else if (routine1Stage == 4) {
+    moveForBack(25, 3400);
+  } else if (routine1Stage == 5) {
+    turnGen(-1, 2400);
+  } else if (routine1Stage == 6) {
+    moveForBack(-25, 3000);
+  } else if (routine1Stage == 7) {
+    turnGen(-1, 600);
+  } else if (routine1Stage == 8) {
+    moveForBack(25, 3400);
+  } else if (routine1Stage == 9) {
+    turnGen(1, 1200);
+  } else if (routine1Stage == 10) {
+    moveForBack(-25, 2000);
+  } else if (routine1Stage == 11) {
+    turnGen(-1, 1400);
+  } else if (routine1Stage == 12) {
+    moveForBack(25, 1800);
+  } else if (routine1Stage == 13) {
+    turnGen(1, 600);
+  } else if (routine1Stage == 14) {
+    moveForBack(-25, 1400);
+  } else if (routine1Stage == 15) {
+    turnGen(-1, 1600);
+  } else if (routine1Stage == 16) {
+    moveForBack(-25, 3000);
+  } else if (routine1Stage == 17) {
+    turnGen(-1, 1500);
+  } else if (routine1Stage == 18) {
+    moveForBack(-25, 2600);
+  } else if (routine1Stage == 19) {
+    turnGen(1, 4500);
+  } else {
+    inRoutine1 = false;
+  }
+  }
+  
 }
 
 // =======================================================================================
