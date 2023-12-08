@@ -106,7 +106,7 @@ boolean blinkOn = false;
 // ---------------------------------------------------------------------------------------
 Servo myServo;
 boolean servoMoving = false;
-int servoPosition = 90;
+int servoPosition = 5;
 boolean force = false;
 long servoTimer = millis();
  int servoInterval = 4500;
@@ -180,9 +180,9 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define LATCH 6
 Adafruit_TLC5947 LEDControl = Adafruit_TLC5947(1, CLOCK, DATA, LATCH);
 int ledMaxBright = 4000; //technically 4095, can go down to 0
-const int numLEDs = 6;
-int numLidLEDsGreen = 4;
-int numLidLEDsRed = 2;
+const int numLEDs = 8;
+const int numLidLEDsGreen = 4;
+const int numLidLEDsRed = 2;
 
 int lidLEDsGreenOffset = numLEDs;
 int lidLEDsRedOffset = numLEDs + numLidLEDsGreen;
@@ -192,6 +192,8 @@ int ambient2[numLEDs];
 int ambient3[numLEDs];
 int ambient4[numLEDs];
 int ambient5[numLEDs];
+
+boolean leftLights[(numLEDs + numLidLEDsGreen + numLidLEDsRed)] = {true, true, false, true, false, false, true, false, false, false, true, true, false, true};
 
 // ---------------------------------------------------------------------------------------
 //    Used for Infrared
@@ -204,12 +206,26 @@ boolean infraredValue;
 // ---------------------------------------------------------------------------------------
 boolean inRoutine1 = false;
 int routine1Stage = -1;
+
+boolean inRoutine2 = false;
+int routine2Stage = -1;
+int chachaFirst = 12;
+//int chachaLast = 38;, 27 total chacha pieces
+int currChaCha = chachaFirst - 1;
+
+boolean inRoutine3 = false;
+int routine3Stage = -1;
+
 boolean routineStageFinished = true;
 long lidTime = 0;
 boolean routineServoIsUp = false;
 long forBackTimer = millis();
 long genTurnTimer = millis();
 long routineServoTimer = millis();
+boolean routineSoundTriggered = false;
+boolean routineLightsTriggered = false;
+
+
 
 // =======================================================================================
 //                                 Main Program
@@ -424,9 +440,22 @@ void loop()
         //front should be about 2 less than dist from left before turn
        }
 
-       if (reqCircle) {
+       if (reqCircle && !inRoutine2 && !inRoutine3) {
         inRoutine1 = true;
         routine1Stage = -1;
+        routineStageFinished = true;
+       }
+
+       if (reqTriangle && !inRoutine1 && !inRoutine3) {
+        inRoutine2 = true;
+        routine2Stage = -1;
+        routineStageFinished = true;
+        currChaCha = chachaFirst - 1;
+       }
+
+       if (reqSquare && !inRoutine1 && !inRoutine2) {
+        inRoutine3 = true;
+        routine3Stage = -1;
         routineStageFinished = true;
        }
 
@@ -434,8 +463,16 @@ void loop()
         routine1();
        }
 
+       if (inRoutine2) {
+        routine2();
+       }
+
+       if (inRoutine3) {
+        routine3();
+       }
+
        
-       if (!inRoutine1) {
+       if (!inRoutine1 && !inRoutine2 && !inRoutine3) {
        if (droidMoving && ambientPlaying) {
           ambientPlaying = false;
           soundInterval = 0;
@@ -474,9 +511,9 @@ void loop()
           ambientNoise();
         }
 
-        if (changeTrack) {
-          displaySound();
-        }
+        //if (changeTrack) {
+        //  displaySound();
+        //}
        }
 
         
@@ -552,11 +589,11 @@ int sign(int a) {
 void servoUp()
 {
     //Serial.println("Droid is now executing my custom ARROW UP function");
-    if (force || servoPosition != 5) {
-    myServo.write(5);
-    servoPosition = 5;
+    if (force || servoPosition != 165) {
+    myServo.write(165);
+    servoPosition = 165;
     track = 8;
-    myMP3Trigger.setVolume(50);
+    myMP3Trigger.setVolume(25);
     myMP3Trigger.trigger(track);
     soundTimer = millis();
     soundInterval = soundsArray[track].millisecs;
@@ -572,11 +609,11 @@ void servoUp()
 void servoDown()
 {
     //Serial.println("Droid is now executing my custom ARROW DOWN function");
-    if (force || (servoTimer + servoInterval < millis() && servoPosition != 90)) {
-    myServo.write(90);
-    servoPosition = 90;
+    if (force || (servoTimer + servoInterval < millis() && servoPosition != 5)) {
+    myServo.write(5);
+    servoPosition = 5;
     track = 7;
-    myMP3Trigger.setVolume(50);
+    myMP3Trigger.setVolume(25);
     myMP3Trigger.trigger(track);
     soundTimer = millis();
     changeTrack = true;
@@ -706,7 +743,7 @@ void ambientNoise() {
     //randomize track
     changeTrack = true;
     track = random(1, 6);
-    myMP3Trigger.setVolume(50);
+    myMP3Trigger.setVolume(25);
     myMP3Trigger.trigger(track /*+ offset*/);
     soundTimer = millis();
     soundInterval = random(1000, 5000);
@@ -772,33 +809,34 @@ void readInfrared() {
 
 void routineServoUp()
 {
-    if (servoPosition != 5) {
-    myServo.write(5);
-    servoPosition = 5;
+    if (servoPosition != 165) {
+    myServo.write(165);
+    servoPosition = 165;
     routineServoIsUp = true;
     track = 8;
-    myMP3Trigger.setVolume(50);
-    myMP3Trigger.trigger(track);
+    myMP3Trigger.setVolume(25);
+    myMP3Trigger.trigger(8);
     soundTimer = millis();
     soundInterval = soundsArray[track].millisecs;
     changeTrack = true;
     servoMoving = true;
-    lidTime = servoInterval;
+    lidTime += servoInterval;
     routineServoTimer = millis();
     lidUpLights();
+    routineLightsTriggered = false;
     }
 
 }
 
 void routineServoDown()
 {
-    if (routineServoTimer + servoInterval < millis() && servoPosition != 90) {
-    myServo.write(90);
-    servoPosition = 90;
+    if (routineServoTimer + servoInterval < millis() && servoPosition != 5) {
+    myServo.write(5);
+    servoPosition = 5;
     routineServoIsUp = false;
     track = 7;
-    myMP3Trigger.setVolume(50);
-    myMP3Trigger.trigger(track);
+    myMP3Trigger.setVolume(25);
+    myMP3Trigger.trigger(7);
     soundTimer = millis();
     changeTrack = true;
     soundInterval = soundsArray[track].millisecs;
@@ -826,6 +864,57 @@ void turnGen(int dir, int degree) {
   
 }
 
+void routineSounds() {
+  if (!routineSoundTriggered) {
+    //randomize track
+    changeTrack = true;
+    track = random(1, 6);
+    myMP3Trigger.setVolume(25);
+    myMP3Trigger.trigger(track /*+ offset*/);
+    soundTimer = millis();
+    //soundInterval = random(1000, 5000);
+    routineSoundTriggered = true;
+    
+  }
+}
+
+void routineLights() {
+  if (!routineLightsTriggered) {
+    if (track == 1) {
+        for (int i = 0; i < numLEDs; i++) {
+          LEDControl.setPWM(i, ambient1[i]);
+        }
+      } else if (track == 2) {
+        for (int i = 0; i < numLEDs; i++) {
+          LEDControl.setPWM(i, ambient2[i]);
+        }
+      } else if (track == 3) {
+        for (int i = 0; i < numLEDs; i++) {
+          LEDControl.setPWM(i, ambient3[i]);
+        }
+      } else if (track == 4) {
+        for (int i = 0; i < numLEDs; i++) {
+          LEDControl.setPWM(i, ambient4[i]);
+        }
+      } else if (track == 5) {
+        for (int i = 0; i < numLEDs; i++) {
+          LEDControl.setPWM(i, ambient5[i]);
+        }
+      }
+    
+      for (int i = numLEDs; i < numLEDs + numLidLEDsGreen; i++) {
+        LEDControl.setPWM(i, 0);
+      }
+
+      for (int i = lidLEDsRedOffset; i < lidLEDsRedOffset + numLidLEDsRed; i++) {
+        LEDControl.setPWM(i, ledMaxBright);
+      }
+    
+      LEDControl.write();
+      routineLightsTriggered = true;
+  }
+}
+
 void routine1() {
   //meander around, intend wave to activate infrared and lid
   //when lid is opened, green light; when lid closes, red light (then turn off)
@@ -837,6 +926,8 @@ void routine1() {
     forBackTimer = millis();
     genTurnTimer = millis();
     lidTime = 0;
+    routineSoundTriggered = false;
+    routineLightsTriggered = false;
   }
 
   readInfrared();
@@ -846,51 +937,632 @@ void routine1() {
   routineServoDown();
 
   if (!routineServoIsUp) {
-  if (routine1Stage == 0) {
-    moveForBack(-25, 3000);
-  } else if (routine1Stage == 1) {
-    turnGen(1, 1800);
-  } else if (routine1Stage == 2) {
-    moveForBack(-25, 2000);
-  } else if (routine1Stage == 3) {
-    turnGen(-1, 1500);
-  } else if (routine1Stage == 4) {
-    moveForBack(25, 3400);
-  } else if (routine1Stage == 5) {
-    turnGen(-1, 2400);
-  } else if (routine1Stage == 6) {
-    moveForBack(-25, 3000);
-  } else if (routine1Stage == 7) {
-    turnGen(-1, 600);
-  } else if (routine1Stage == 8) {
-    moveForBack(25, 3400);
-  } else if (routine1Stage == 9) {
-    turnGen(1, 1200);
-  } else if (routine1Stage == 10) {
-    moveForBack(-25, 2000);
-  } else if (routine1Stage == 11) {
-    turnGen(-1, 1400);
-  } else if (routine1Stage == 12) {
-    moveForBack(25, 1800);
-  } else if (routine1Stage == 13) {
-    turnGen(1, 600);
-  } else if (routine1Stage == 14) {
-    moveForBack(-25, 1400);
-  } else if (routine1Stage == 15) {
-    turnGen(-1, 1600);
-  } else if (routine1Stage == 16) {
-    moveForBack(-25, 3000);
-  } else if (routine1Stage == 17) {
-    turnGen(-1, 1500);
-  } else if (routine1Stage == 18) {
-    moveForBack(-25, 2600);
-  } else if (routine1Stage == 19) {
-    turnGen(1, 4500);
-  } else {
-    inRoutine1 = false;
-  }
+    if (routine1Stage == 0) {
+      moveForBack(-25, 3000);
+    } else if (routine1Stage == 1) {
+      turnGen(1, 1800);
+    } else if (routine1Stage == 2) {
+      moveForBack(-25, 2000);
+    } else if (routine1Stage == 3) {
+      turnGen(-1, 1500);
+    } else if (routine1Stage == 4) {
+      moveForBack(25, 3400);
+    } else if (routine1Stage == 5) {
+      turnGen(-1, 2400);
+    } else if (routine1Stage == 6) {
+      moveForBack(-25, 3000);
+    } else if (routine1Stage == 7) {
+      turnGen(-1, 600);
+    } else if (routine1Stage == 8) {
+      moveForBack(25, 3400);
+    } else if (routine1Stage == 9) {
+      turnGen(1, 1200);
+    } else if (routine1Stage == 10) {
+      moveForBack(-25, 2000);
+    } else if (routine1Stage == 11) {
+      turnGen(-1, 1400);
+    } else if (routine1Stage == 12) {
+      moveForBack(25, 1800);
+    } else if (routine1Stage == 13) {
+      turnGen(1, 600);
+    } else if (routine1Stage == 14) {
+      moveForBack(-25, 1400);
+    } else if (routine1Stage == 15) {
+      turnGen(-1, 1600);
+    } else if (routine1Stage == 16) {
+      moveForBack(-25, 3000);
+    } else if (routine1Stage == 17) {
+      turnGen(-1, 1500);
+    } else if (routine1Stage == 18) {
+      moveForBack(-25, 2600);
+    } else if (routine1Stage == 19) {
+      turnGen(1, 4500);
+    } else {
+      inRoutine1 = false;
+    }
+    routineSounds();
+    routineLights();
   }
   
+}
+
+void chachaSounds() {
+  if (!routineSoundTriggered) {
+    myMP3Trigger.setVolume(25);
+    myMP3Trigger.trigger(currChaCha);
+    routineSoundTriggered = true;
+  }
+}
+
+void crisscrossLights(long len) {
+  //need something special for criss cross
+  if ((forBackTimer + (len * 1 / 8)) > millis()) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+    for (int i = numLEDs; i < numLEDs + numLidLEDsGreen; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+
+    for (int i = lidLEDsRedOffset; i < lidLEDsRedOffset + numLidLEDsRed; i++) {
+      LEDControl.setPWM(i, ledMaxBright);
+    }
+  } else if ((forBackTimer + (len * 2 / 8)) > millis()) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+    for (int i = numLEDs; i < numLEDs + numLidLEDsGreen; i++) {
+      LEDControl.setPWM(i, ledMaxBright);
+    }
+
+    for (int i = lidLEDsRedOffset; i < lidLEDsRedOffset + numLidLEDsRed; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+  } else if ((forBackTimer + (len * 3 / 8)) > millis()) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+    for (int i = numLEDs; i < numLEDs + numLidLEDsGreen; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+
+    for (int i = lidLEDsRedOffset; i < lidLEDsRedOffset + numLidLEDsRed; i++) {
+      LEDControl.setPWM(i, ledMaxBright);
+    }
+  } else if ((forBackTimer + (len * 4 / 8)) > millis()) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+    for (int i = numLEDs; i < numLEDs + numLidLEDsGreen; i++) {
+      LEDControl.setPWM(i, ledMaxBright);
+    }
+
+    for (int i = lidLEDsRedOffset; i < lidLEDsRedOffset + numLidLEDsRed; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+  } else if ((forBackTimer + (len * 5 / 8)) > millis()) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+    for (int i = numLEDs; i < numLEDs + numLidLEDsGreen; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+
+    for (int i = lidLEDsRedOffset; i < lidLEDsRedOffset + numLidLEDsRed; i++) {
+      LEDControl.setPWM(i, ledMaxBright);
+    }
+  } else if ((forBackTimer + (len * 6 / 8)) > millis()) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+    for (int i = numLEDs; i < numLEDs + numLidLEDsGreen; i++) {
+      LEDControl.setPWM(i, ledMaxBright);
+    }
+
+    for (int i = lidLEDsRedOffset; i < lidLEDsRedOffset + numLidLEDsRed; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+  } else if ((forBackTimer + (len * 7 / 8)) > millis()) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+    for (int i = numLEDs; i < numLEDs + numLidLEDsGreen; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+
+    for (int i = lidLEDsRedOffset; i < lidLEDsRedOffset + numLidLEDsRed; i++) {
+      LEDControl.setPWM(i, ledMaxBright);
+    }
+  } else if ((forBackTimer + (len * 8 / 8)) > millis()) {
+    for (int i = 0; i < numLEDs; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+    for (int i = numLEDs; i < numLEDs + numLidLEDsGreen; i++) {
+      LEDControl.setPWM(i, ledMaxBright);
+    }
+
+    for (int i = lidLEDsRedOffset; i < lidLEDsRedOffset + numLidLEDsRed; i++) {
+      LEDControl.setPWM(i, 0);
+    }
+  } else {
+    routineStageFinished = true;
+  }
+  LEDControl.write();
+}
+
+void chachaServo(int len) {
+  if (routineServoTimer + (len / 2) > millis()) {
+    if (servoPosition != 165) {
+      myServo.write(165);
+      servoPosition = 165;
+    }
+  } else if (routineServoTimer + len > millis()) {
+    if (servoPosition != 5) {
+      myServo.write(5);
+      servoPosition = 5;
+    }
+  }
+  else {
+    routineStageFinished = true;
+  }
+}
+
+void moveChaCha(int vel, int dist) {
+  if ((forBackTimer + (dist * 9 / 10)) > millis()) {
+    ST->turn(0);
+    ST->drive(vel);
+  } else if ((forBackTimer + dist) > millis()) {
+    ST->stop();
+  }
+  else {
+    routineStageFinished = true;
+  }
+}
+
+void turnChaCha(int dir, long len) {
+  if ((genTurnTimer + (len * 9 / 10)) > millis()) {
+    ST->turn(dir * 30);
+    ST->drive(0);
+  } else if ((genTurnTimer + len) > millis()) {
+    ST->stop();
+  } else {
+    routineStageFinished = true;
+  }
+  
+}
+
+void chachaStomp(int dir, int len) {
+  if ((genTurnTimer + (len * 5 / 11)) > millis()) {
+    ST->turn(dir * 30);
+    ST->drive(0);
+  } else if ((genTurnTimer + (len * 10 / 11)) > millis()) {
+    ST->turn(dir * -1 * 30);
+    ST->drive(0);
+  } else if ((genTurnTimer + len) > millis()) {
+    ST->stop();
+  } else {
+    routineStageFinished = true;
+  }
+}
+
+void chachaLeft() {
+  if (!routineLightsTriggered) {
+    for (int i = 0; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
+      if (leftLights[i]) {
+      LEDControl.setPWM(i, ledMaxBright);
+      } else {
+        LEDControl.setPWM(i, 0);
+      }
+    }
+    LEDControl.write();
+    routineLightsTriggered = true;
+  }
+}
+
+void chachaRight() {
+  if (!routineLightsTriggered) {
+    for (int i = 0; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
+      if (leftLights[i]) {
+      LEDControl.setPWM(i, 0);
+      } else {
+        LEDControl.setPWM(i, ledMaxBright);
+      }
+    }
+    LEDControl.write();
+    routineLightsTriggered = true;
+  }
+}
+
+void chachaAllOn() {
+  if (!routineLightsTriggered) {
+    for (int i = 0; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
+        LEDControl.setPWM(i, ledMaxBright);
+    }
+    LEDControl.write();
+    routineLightsTriggered = true;
+  }
+}
+
+void routine2() {
+  //cha cha slide
+  //start in center
+  if (routineStageFinished) {
+    routineStageFinished = false;
+    routine2Stage++;
+    if (routine2Stage == 0) {
+      currChaCha++;
+      routineSoundTriggered = false;
+    }
+    forBackTimer = millis();
+    genTurnTimer = millis();
+    routineServoTimer = millis();
+    routineLightsTriggered = false;
+  }
+
+  if (routine2Stage == 0) {
+    if (forBackTimer + 2800 < millis()) {
+      routineStageFinished = true;
+    }
+    chachaAllOn();
+  } else if (routine2Stage == 1) {
+    turnChaCha(-1, 2240);
+    chachaLeft();
+    //to the left, 2240
+    
+  } else if (routine2Stage == 2) {
+    moveChaCha(25, 1600);
+    chachaAllOn();
+    //take it back, 1200
+  } else if (routine2Stage == 3) {
+    chachaServo(2000);
+    chachaAllOn();
+    //one hop, 2400
+  } else if (routine2Stage == 4) {
+    chachaStomp(1, 1600);
+    chachaRight();
+    //right foot stomp, 1600
+    
+  } else if (routine2Stage == 5) {
+    chachaStomp(-1, 1960);
+    chachaLeft();
+    //left foot stomp, 1960
+    
+  } else if (routine2Stage == 6) {
+    //chachaStomp(1, 1600);
+    //turnChaCha(-1, 6380);
+    turnChaCha(1, 6380);
+    chachaRight();
+    //cha cha, 1880
+    
+  } else if (routine2Stage == 7) {
+    //to the left, 1480
+    turnChaCha(-1, 1480);
+    chachaLeft();
+  } else if (routine2Stage == 8) {
+    //take it back, 2200
+    moveChaCha(25, 2200);
+    chachaAllOn();
+    
+  } else if (routine2Stage == 9) {
+    //one hop
+    chachaServo(2400);
+    chachaAllOn();
+    
+  } else if (routine2Stage == 10) {
+    //right foot stomp
+    chachaStomp(1, 1600);
+    chachaRight();
+    
+  } else if (routine2Stage == 11) {
+    //left foot stomp
+    chachaStomp(-1, 1960);
+    chachaLeft();
+    
+  } else if (routine2Stage == 12) {
+    //cha cha
+    turnChaCha(-1, 4000);
+    chachaLeft();
+    
+  } else if (routine2Stage == 13) {
+    //to the right
+    turnChaCha(1, 2240);
+    chachaRight();
+    
+  } else if (routine2Stage == 14) {
+    //to the left
+    turnChaCha(-1, 1840);
+    chachaLeft();
+    
+  } else if (routine2Stage == 15) {
+    //take it back
+    moveChaCha(25, 1600);
+    chachaAllOn();
+  } else if (routine2Stage == 16) {
+    //one hop
+    chachaServo(2400);
+  } else if (routine2Stage == 17) {
+    //one hop
+    chachaServo(2000);
+    chachaAllOn();
+  } else if (routine2Stage == 18) {
+    //right foot stomp x2
+    chachaStomp(1, 850);
+    chachaRight();
+  } else if (routine2Stage == 19) {
+    //right foot stomp x2
+    chachaStomp(1, 850);
+    chachaRight();
+  } else if (routine2Stage == 20) {
+    //left foot stomp x2
+    chachaStomp(-1, 850);
+    chachaLeft();
+  } else if (routine2Stage == 21) {
+    //left foot stomp x2
+    chachaStomp(-1, 850);
+    chachaLeft();
+  } else if (routine2Stage == 22) {
+    //slide left
+    turnChaCha(-1, 2240);
+    chachaLeft();
+    
+    
+  } else if (routine2Stage == 23) {
+    //slide right
+    turnChaCha(1, 2240);
+    chachaRight();
+    
+  } else if (routine2Stage == 24) {
+    //criss cross x2
+    crisscrossLights(4000);
+    if (forBackTimer + 4000 < millis()) {
+      routineStageFinished = true;
+    }
+  } else if (routine2Stage == 25) {
+    //cha cha
+    turnChaCha(1, 2500);
+    chachaRight();
+  } else {
+    inRoutine2 = false;
+  }
+
+  chachaSounds();
+  //chachaLights();
+}
+
+void chomp() {
+  if (routineServoTimer + 500 > millis()) {
+    if (servoPosition != 165) {
+      myServo.write(165);
+      servoPosition = 165;
+    }
+  } else if (routineServoTimer + 1000 > millis()) {
+    if (servoPosition != 5) {
+      myServo.write(5);
+      servoPosition = 5;
+    }
+  } else {
+    routineServoTimer = millis();
+  }
+}
+
+void getOutSounds() {
+  if (!routineSoundTriggered) {
+    myMP3Trigger.setVolume(25);
+    myMP3Trigger.trigger(9);
+    routineSoundTriggered = true;
+  }
+}
+
+void getOutLights() {
+  if (servoPosition == 165) {
+    if (!routineLightsTriggered) {
+      for (int i = 0; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
+          LEDControl.setPWM(i, ledMaxBright);
+      }
+      LEDControl.write();
+      routineLightsTriggered = true;
+    }
+  } else if (servoPosition == 5) {
+    if (routineLightsTriggered) {
+      for (int i = 0; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
+          LEDControl.setPWM(i, 0);
+      }
+      LEDControl.write();
+      routineLightsTriggered = false;
+    }
+  }
+}
+
+void routine3() {
+  //baby shark get out
+  if (routineStageFinished) {
+    routineStageFinished = false;
+    routine3Stage++;
+    if (routine3Stage == 0) {
+      routineSoundTriggered = false;
+      routineServoTimer = millis();
+      routineLightsTriggered = false;
+    }
+    forBackTimer = millis();
+    genTurnTimer = millis();
+  }
+
+  //servo stuff
+  chomp();
+  getOutLights();
+  //movement
+  if (routine3Stage == 0) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 1) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 2) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 3) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 4) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 5) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 6) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 7) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 8) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 9) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 10) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 11) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 12) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 13) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 14) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 15) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 16) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 17) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 18) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 19) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 20) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 21) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 22) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 23) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 24) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 25) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 26) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 27) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 28) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 29) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 30) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 31) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 32) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 33) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 34) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 35) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 36) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 37) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 38) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 39) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 40) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 41) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 42) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 43) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 44) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 45) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 46) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 47) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 48) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 49) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 50) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 51) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 52) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 53) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 54) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 55) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 56) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 57) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 58) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 59) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 60) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 61) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 62) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 63) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 64) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 65) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 66) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 67) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 68) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 69) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 70) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 71) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 72) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 73) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 74) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 75) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 76) {
+    moveForBack(70, 500);
+  } else if (routine3Stage == 77) {
+    turnGen(1, 1000);
+  } else if (routine3Stage == 78) {
+    moveForBack(-70, 500);
+  } else if (routine3Stage == 79) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 80) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 81) {
+    turnGen(-1, 500);
+  } else if (routine3Stage == 82) {
+    turnGen(1, 500);
+  } else if (routine3Stage == 83) {
+    moveForBack(70, 500);
+  } else {
+    inRoutine3 = false;
+  }
+  getOutSounds();
 }
 
 // =======================================================================================
