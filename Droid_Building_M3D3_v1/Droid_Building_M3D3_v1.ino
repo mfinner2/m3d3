@@ -162,6 +162,7 @@ NewPing leftBackSonar = NewPing(36, 37);
  bool changeTrack = false;
 
  bool ambientPlaying = true;
+ bool initiateAmbient = false;
 
 
 // ---------------------------------------------------------------------------------------
@@ -355,108 +356,38 @@ void loop()
        // ----------------------------------------------
     
        // Sample droid function call from PS3 request - REMOVE ONCE YOU UNDERSTAND STRUCTURE
+       
+
        if (reqCross) {
-          if (autoMode == true) {
-            autoMode = false;
-          } else {
             autoMode = true;
-            sonarIntervalTimer = millis();
-            currentFrontDistance = -1; //distance in centimeters
-            currentLeftFrontDistance = -1;
-            currentBackDistance = -1;
-            currentLeftBackDistance = -1;
-            tapeDistanceFront = -1;
-            tapeDistanceBack = -1;
-            autonCounter = 0;
-            autonSetFinished = false;
-          }
-       }
-       if (autoMode == false) {
-       if (reqArrowUp) {
-          force = true;
-          servoUp();
-       }
-
-       if (reqArrowDown) {
-          force = true;
-          servoDown();
-       }
-
-       moveDroid();
-       }
-
-       if (autoMode == true) {
-        takeSonarReadings();
-        Serial.print("Front: ");
-          Serial.println(currentFrontDistance);
-          Serial.print("Left Front: ");
-          Serial.println(currentLeftFrontDistance);
-          Serial.print("Left Back: ");
-          Serial.println(currentLeftBackDistance);
-          Serial.print("Back: ");
-          Serial.println(currentBackDistance);
-        if (!(tapeDistanceFront == -1 || tapeDistanceBack == -1)) {
-        if (autonCounter == 0 || autonCounter == 2 || autonCounter == 4 || autonCounter == 6) {
-           moveForward();
-        } else if (autonCounter == 1) {
-          turnRight();
-        }
-        if (autonSetFinished) {
-          stopDrive();
-          autonCounter++;
-          turnTimer = millis();
-          autonSetFinished = false;
-        }
-        /*
-          Serial.print("Front: ");
-          Serial.println(currentFrontDistance);
-          Serial.print("Left Front: ");
-          Serial.println(currentLeftFrontDistance);
-          Serial.print("Left Back: ");
-          Serial.println(currentLeftBackDistance);
-          Serial.print("Back: ");
-          Serial.println(currentBackDistance);
-          if (autonSetFinished) {
-            stopDrive();
-            autonCounter++;
-            turnTimer = millis();
-          }
-          if (autonCounter == 0 || autonCounter == 2 || autonCounter == 4 || autonCounter == 6) {
-            moveForward();
-          }
-          if (autonCounter == 1 || autonCounter == 3 || autonCounter == 5) {
-            turnRight();
-          }
-          if (autonCounter == 7 || autonCounter == 9 || autonCounter == 11 || autonCounter == 13) {
-            moveBackward();
-          }
-          if (autonCounter == 8 || autonCounter == 10 || autonCounter == 12) {
-            turnRightBackward();
-          } */
-        } else {
-          tapeDistanceFront = currentLeftFrontDistance;
-          tapeDistanceBack = currentLeftBackDistance;
-        }
-        //front should be about 2 less than dist from left before turn
+            autonCounter = -1;
+            autonSetFinished = true;
+            ambientPlaying = false;
        }
 
        if (reqCircle && !inRoutine2 && !inRoutine3) {
         inRoutine1 = true;
         routine1Stage = -1;
         routineStageFinished = true;
+        routineSoundTriggered = true;
+        ambientPlaying = false;
        }
 
        if (reqTriangle && !inRoutine1 && !inRoutine3) {
         inRoutine2 = true;
         routine2Stage = -1;
         routineStageFinished = true;
-        currChaCha = chachaFirst - 1;
+        currChaCha = chachaFirst;
+        routineSoundTriggered = true;
+        ambientPlaying = false;
        }
 
        if (reqSquare && !inRoutine1 && !inRoutine2) {
         inRoutine3 = true;
         routine3Stage = -1;
         routineStageFinished = true;
+        routineSoundTriggered = true;
+        ambientPlaying = false;
        }
 
        if (inRoutine1) {
@@ -471,9 +402,16 @@ void loop()
         routine3();
        }
 
+       if (autoMode) {
+        autoRoutine();
+       }
+
        
-       if (!inRoutine1 && !inRoutine2 && !inRoutine3) {
-       if (droidMoving && ambientPlaying) {
+       if (!inRoutine1 && !inRoutine2 && !inRoutine3 && !autoMode) {
+        if (reqSelect) {
+          initiateAmbient = true;
+        }
+       /*if (droidMoving && ambientPlaying) {
           ambientPlaying = false;
           soundInterval = 0;
           movementSound(); 
@@ -482,9 +420,9 @@ void loop()
 
         if (droidMoving) {
           movementSound();
-        }
+        }*/
 
-        if (!droidMoving && !ambientPlaying) {
+        /*if (!droidMoving && !ambientPlaying) {
           ambientPlaying = true;
           soundInterval = 0;
         }
@@ -505,15 +443,26 @@ void loop()
           ambientPlaying = false;
         }
 
-        servoMoving = false;
+        servoMoving = false;*/
 
-        if (ambientPlaying) {
+        //if (ambientPlaying) {
           ambientNoise();
-        }
+        //}
 
         //if (changeTrack) {
         //  displaySound();
         //}
+        /*if (reqArrowUp) {
+          force = true;
+          servoUp();
+       }
+
+       if (reqArrowDown) {
+          force = true;
+          servoDown();
+       }*/
+
+       moveDroid();
        }
 
         
@@ -651,7 +600,7 @@ void lidDownLights() {
 void moveDroid() { //not finished, but a start
   if (reqLeftJoyMade || reqRightJoyMade) {
     currentSpeed = M3D3Max(M3D3Min(currentSpeed + 1, reqLeftJoyYValue * 2 / 3), currentSpeed - 1);
-    currentTurn = M3D3Min(160 - M3D3Abs(currentSpeed), M3D3Max(-1 * (160 - M3D3Abs(currentSpeed)), reqRightJoyXValue/3));
+    currentTurn = M3D3Min(160 - M3D3Abs(currentSpeed), M3D3Max(-1 * (160 - M3D3Abs(currentSpeed)), reqRightJoyXValue * 2/3));
     ST->turn(currentTurn);
     ST->drive(currentSpeed);
     if (!droidMoving) {
@@ -693,14 +642,79 @@ if (sonarReadCycle == 0) {
 sonarReadCycle = (sonarReadCycle + 1) % 4;
 }
 
+void autoRoutine() {
+        if (autonSetFinished) {
+          //stopDrive();
+          autonCounter++;
+          turnTimer = millis();
+          autonSetFinished = false;
+          if (autonCounter == 0) {
+            sonarIntervalTimer = millis();
+            currentFrontDistance = -1; //distance in centimeters
+            currentLeftFrontDistance = -1;
+            currentBackDistance = -1;
+            currentLeftBackDistance = -1;
+            tapeDistanceFront = -1;
+            tapeDistanceBack = -1;
+          }
+        }
+        takeSonarReadings();
+        Serial.print("Front: ");
+          Serial.println(currentFrontDistance);
+          Serial.print("Left Front: ");
+          Serial.println(currentLeftFrontDistance);
+          Serial.print("Left Back: ");
+          Serial.println(currentLeftBackDistance);
+          Serial.print("Back: ");
+          Serial.println(currentBackDistance);
+        if (!(tapeDistanceFront == -1 || tapeDistanceBack == -1)) {
+        if (autonCounter == 0 || autonCounter == 2 || autonCounter == 4 || autonCounter == 6) {
+           moveForward();
+        } else if (autonCounter == 1 || autonCounter == 3 || autonCounter == 5) {
+          turnRight();
+        } else if (autonCounter == 7 || autonCounter == 9 || autonCounter == 11 || autonCounter == 13) {
+          moveBackward();
+        } else if (autonCounter == 8 || autonCounter == 10 || autonCounter == 12) {
+          turnRightBackward();
+        } else {
+          autoMode = false;
+        }
+        
+          /*Serial.print("Front: ");
+          Serial.println(currentFrontDistance);
+          Serial.print("Left Front: ");
+          Serial.println(currentLeftFrontDistance);
+          Serial.print("Left Back: ");
+          Serial.println(currentLeftBackDistance);
+          Serial.print("Back: ");
+          Serial.println(currentBackDistance);*/
+          /*if (autonCounter == 0 || autonCounter == 2 || autonCounter == 4 || autonCounter == 6) {
+            moveForward();
+          }
+          if (autonCounter == 1 || autonCounter == 3 || autonCounter == 5) {
+            turnRight();
+          }
+          if (autonCounter == 7 || autonCounter == 9 || autonCounter == 11 || autonCounter == 13) {
+            moveBackward();
+          }
+          if (autonCounter == 8 || autonCounter == 10 || autonCounter == 12) {
+            turnRightBackward();
+          }*/
+        } else {
+          tapeDistanceFront = currentLeftFrontDistance;
+          tapeDistanceBack = currentLeftBackDistance;
+        }
+        //front should be about 2 less than dist from left before turn
+       }
+
 void moveForward() {
-  if (currentFrontDistance - ((tapeDistanceFront + tapeDistanceBack)/2) > 3) {
+  if (currentFrontDistance - ((tapeDistanceFront + tapeDistanceBack)/2) > -1 || currentFrontDistance < 0) {
     autonSwerveVal = 0;
     if (tapeDistanceFront < currentLeftFrontDistance) {
-      autonSwerveVal -= 4;
+      autonSwerveVal -= (currentLeftFrontDistance - tapeDistanceFront);
     }
     if (tapeDistanceFront > currentLeftFrontDistance) {
-      autonSwerveVal += 4;
+      autonSwerveVal += (tapeDistanceFront - currentLeftFrontDistance);
     }
     ST->turn(autonSwerveVal);
     ST->drive(-50);
@@ -711,7 +725,7 @@ void moveForward() {
 }
 
 void turnRight() {
-  if ((turnTimer + 750) > millis()) { //bumped up since it might be catching the wall at the last second
+  if ((turnTimer + 1000) > millis()) { //bumped up since it might be catching the wall at the last second
     ST->turn(60);
     ST->drive(0);
   } else {
@@ -721,11 +735,28 @@ void turnRight() {
 }
 
 void moveBackward() {
-  
+  if (currentBackDistance - ((tapeDistanceFront + tapeDistanceBack)/2) > 7 || currentBackDistance < 0) { //likely increase the 7
+    autonSwerveVal = 0;
+    if (tapeDistanceFront < currentLeftFrontDistance) {
+      autonSwerveVal -= (currentLeftFrontDistance - tapeDistanceFront); //halve
+    }
+    if (tapeDistanceFront > currentLeftFrontDistance) {
+      autonSwerveVal += (tapeDistanceFront - currentLeftFrontDistance); //halve
+    }
+    ST->turn(-1 * autonSwerveVal);
+    ST->drive(50);
+  } else {
+    autonSetFinished = true;
+  }
 }
 
 void turnRightBackward() {
-  
+  if ((turnTimer + 1000) > millis()) { //bumped up since it might be catching the wall at the last second
+    ST->turn(-60);
+    ST->drive(0);
+  } else {
+    autonSetFinished = true;
+  }
 }
 
 void stopDrive() {
@@ -733,7 +764,7 @@ void stopDrive() {
 }
 
 void ambientNoise() {
-  
+  if (initiateAmbient) {
   if (track != 0 && soundTimer + soundsArray[track].millisecs < millis()) {
     changeTrack = true;
     track = 0;
@@ -749,6 +780,7 @@ void ambientNoise() {
     soundInterval = random(1000, 5000);
     ambientLights();
     
+  }
   }
 }
 
@@ -845,6 +877,16 @@ void routineServoDown()
     }
 }
 
+void lightsAllOff() {
+  if (!routineLightsTriggered) {
+    for (int i = 0; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
+        LEDControl.setPWM(i, 0);
+    }
+    LEDControl.write();
+    routineLightsTriggered = true;
+  }
+}
+
 void moveForBack(int vel, int dist) {
   if ((forBackTimer + lidTime + dist) > millis()) {
     ST->turn(0);
@@ -856,7 +898,7 @@ void moveForBack(int vel, int dist) {
 
 void turnGen(int dir, int degree) {
   if ((genTurnTimer + lidTime + degree) > millis()) {
-    ST->turn(dir * 30);
+    ST->turn(dir * 60);
     ST->drive(0);
   } else {
     routineStageFinished = true;
@@ -935,50 +977,50 @@ void routine1() {
     routineServoUp();
   }
   routineServoDown();
-
-  if (!routineServoIsUp) {
+    if (!routineServoIsUp) {
     if (routine1Stage == 0) {
-      moveForBack(-25, 3000);
+      moveForBack(-50, 3000);
     } else if (routine1Stage == 1) {
       turnGen(1, 1800);
     } else if (routine1Stage == 2) {
-      moveForBack(-25, 2000);
+      moveForBack(-50, 2000);
     } else if (routine1Stage == 3) {
       turnGen(-1, 1500);
     } else if (routine1Stage == 4) {
-      moveForBack(25, 3400);
+      moveForBack(50, 3400);
     } else if (routine1Stage == 5) {
       turnGen(-1, 2400);
     } else if (routine1Stage == 6) {
-      moveForBack(-25, 3000);
+      moveForBack(-50, 3000);
     } else if (routine1Stage == 7) {
       turnGen(-1, 600);
     } else if (routine1Stage == 8) {
-      moveForBack(25, 3400);
+      moveForBack(50, 3400);
     } else if (routine1Stage == 9) {
       turnGen(1, 1200);
     } else if (routine1Stage == 10) {
-      moveForBack(-25, 2000);
+      moveForBack(-50, 2000);
     } else if (routine1Stage == 11) {
       turnGen(-1, 1400);
     } else if (routine1Stage == 12) {
-      moveForBack(25, 1800);
+      moveForBack(50, 1800);
     } else if (routine1Stage == 13) {
       turnGen(1, 600);
     } else if (routine1Stage == 14) {
-      moveForBack(-25, 1400);
+      moveForBack(-50, 1400);
     } else if (routine1Stage == 15) {
       turnGen(-1, 1600);
     } else if (routine1Stage == 16) {
-      moveForBack(-25, 3000);
+      moveForBack(-50, 3000);
     } else if (routine1Stage == 17) {
       turnGen(-1, 1500);
     } else if (routine1Stage == 18) {
-      moveForBack(-25, 2600);
+      moveForBack(-50, 2600);
     } else if (routine1Stage == 19) {
       turnGen(1, 4500);
     } else {
       inRoutine1 = false;
+      lightsAllOff();
     }
     routineSounds();
     routineLights();
@@ -1121,7 +1163,7 @@ void moveChaCha(int vel, int dist) {
 
 void turnChaCha(int dir, long len) {
   if ((genTurnTimer + (len * 9 / 10)) > millis()) {
-    ST->turn(dir * 30);
+    ST->turn(dir * 60);
     ST->drive(0);
   } else if ((genTurnTimer + len) > millis()) {
     ST->stop();
@@ -1131,12 +1173,12 @@ void turnChaCha(int dir, long len) {
   
 }
 
-void chachaStomp(int dir, int len) {
+void chachaStomp(int dir, long len) {
   if ((genTurnTimer + (len * 5 / 11)) > millis()) {
-    ST->turn(dir * 30);
+    ST->turn(dir * 60);
     ST->drive(0);
   } else if ((genTurnTimer + (len * 10 / 11)) > millis()) {
-    ST->turn(dir * -1 * 30);
+    ST->turn(dir * -1 * 60);
     ST->drive(0);
   } else if ((genTurnTimer + len) > millis()) {
     ST->stop();
@@ -1189,8 +1231,7 @@ void routine2() {
   if (routineStageFinished) {
     routineStageFinished = false;
     routine2Stage++;
-    if (routine2Stage == 0) {
-      currChaCha++;
+    if (routine2Stage == 0){
       routineSoundTriggered = false;
     }
     forBackTimer = millis();
@@ -1198,6 +1239,8 @@ void routine2() {
     routineServoTimer = millis();
     routineLightsTriggered = false;
   }
+
+  chachaSounds();
 
   if (routine2Stage == 0) {
     if (forBackTimer + 2800 < millis()) {
@@ -1210,7 +1253,7 @@ void routine2() {
     //to the left, 2240
     
   } else if (routine2Stage == 2) {
-    moveChaCha(25, 1600);
+    moveChaCha(50, 1600);
     chachaAllOn();
     //take it back, 1200
   } else if (routine2Stage == 3) {
@@ -1240,7 +1283,7 @@ void routine2() {
     chachaLeft();
   } else if (routine2Stage == 8) {
     //take it back, 2200
-    moveChaCha(25, 2200);
+    moveChaCha(50, 2200);
     chachaAllOn();
     
   } else if (routine2Stage == 9) {
@@ -1275,7 +1318,7 @@ void routine2() {
     
   } else if (routine2Stage == 15) {
     //take it back
-    moveChaCha(25, 1600);
+    moveChaCha(50, 1600);
     chachaAllOn();
   } else if (routine2Stage == 16) {
     //one hop
@@ -1323,9 +1366,8 @@ void routine2() {
     chachaRight();
   } else {
     inRoutine2 = false;
+    lightsAllOff();
   }
-
-  chachaSounds();
   //chachaLights();
 }
 
@@ -1390,6 +1432,7 @@ void routine3() {
   //servo stuff
   chomp();
   getOutLights();
+  getOutSounds();
   //movement
   if (routine3Stage == 0) {
     turnGen(1, 1000);
@@ -1561,8 +1604,10 @@ void routine3() {
     moveForBack(70, 500);
   } else {
     inRoutine3 = false;
+    force = true;
+    servoDown();
+    lightsAllOff();
   }
-  getOutSounds();
 }
 
 // =======================================================================================
