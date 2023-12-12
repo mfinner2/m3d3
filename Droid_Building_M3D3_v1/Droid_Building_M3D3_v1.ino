@@ -602,7 +602,7 @@ void lidDownLights() {
 void moveDroid() { //not finished, but a start
   if (reqLeftJoyMade || reqRightJoyMade) {
     currentSpeed = M3D3Max(M3D3Min(currentSpeed + 1, reqLeftJoyYValue * 2 / 3), currentSpeed - 1);
-    currentTurn = M3D3Min(160 - M3D3Abs(currentSpeed), M3D3Max(-1 * (160 - M3D3Abs(currentSpeed)), reqRightJoyXValue * 2/3));
+    currentTurn = M3D3Min(160 - M3D3Abs(currentSpeed), M3D3Max(-1 * (160 - M3D3Abs(currentSpeed)), reqRightJoyXValue / 2));
     ST->turn(currentTurn);
     ST->drive(currentSpeed);
     if (!droidMoving) {
@@ -737,13 +737,13 @@ void turnRight() {
 }
 
 void moveBackward() {
-  if (currentBackDistance - ((tapeDistanceFront + tapeDistanceBack)/2) > 7 || currentBackDistance < 0) { //likely increase the 7
+  if (currentBackDistance - ((tapeDistanceFront + tapeDistanceBack)/2) > 15 || currentBackDistance < 0 || (turnTimer + 500) > millis()) { //likely increase the 7
     autonSwerveVal = 0;
-    if (tapeDistanceFront < currentLeftFrontDistance) {
-      autonSwerveVal -= (currentLeftFrontDistance - tapeDistanceFront); //halve
+    if (tapeDistanceBack < currentLeftBackDistance) {
+      autonSwerveVal -= M3D3Min((currentLeftBackDistance - tapeDistanceBack), 10); //halve
     }
-    if (tapeDistanceFront > currentLeftFrontDistance) {
-      autonSwerveVal += (tapeDistanceFront - currentLeftFrontDistance); //halve
+    if (tapeDistanceBack > currentLeftBackDistance) {
+      autonSwerveVal += M3D3Min((tapeDistanceBack- currentLeftBackDistance), 10); //halve
     }
     ST->turn(-1 * autonSwerveVal);
     ST->drive(50);
@@ -753,7 +753,7 @@ void moveBackward() {
 }
 
 void turnRightBackward() {
-  if ((turnTimer + 1000) > millis()) { //bumped up since it might be catching the wall at the last second
+  if ((turnTimer + 1300) > millis()) { //bumped up since it might be catching the wall at the last second
     ST->turn(-60);
     ST->drive(0);
   } else {
@@ -900,7 +900,7 @@ void moveForBack(int vel, int dist) {
 
 void turnGen(int dir, int degree) {
   if ((genTurnTimer + lidTime + degree) > millis()) {
-    ST->turn(dir * 60);
+    ST->turn(dir * 40);
     ST->drive(0);
   } else {
     routineStageFinished = true;
@@ -985,43 +985,43 @@ void routine1() {
   routineServoDown();
     if (!routineServoIsUp) {
     if (routine1Stage == 0) {
-      moveForBack(-50, 3000);
+      moveForBack(-40, 3000);
     } else if (routine1Stage == 1) {
       turnGen(1, 1800);
     } else if (routine1Stage == 2) {
-      moveForBack(-50, 2000);
+      moveForBack(-40, 2000);
     } else if (routine1Stage == 3) {
       turnGen(-1, 1500);
     } else if (routine1Stage == 4) {
-      moveForBack(50, 3400);
+      moveForBack(40, 3400);
     } else if (routine1Stage == 5) {
       turnGen(-1, 2400);
     } else if (routine1Stage == 6) {
-      moveForBack(-50, 3000);
+      moveForBack(-40, 3000);
     } else if (routine1Stage == 7) {
       turnGen(-1, 600);
     } else if (routine1Stage == 8) {
-      moveForBack(50, 3400);
+      moveForBack(40, 3400);
     } else if (routine1Stage == 9) {
       turnGen(1, 1200);
     } else if (routine1Stage == 10) {
-      moveForBack(-50, 2000);
+      moveForBack(-40, 2000);
     } else if (routine1Stage == 11) {
       turnGen(-1, 1400);
     } else if (routine1Stage == 12) {
-      moveForBack(50, 1800);
+      moveForBack(40, 1800);
     } else if (routine1Stage == 13) {
       turnGen(1, 600);
     } else if (routine1Stage == 14) {
-      moveForBack(-50, 1400);
+      moveForBack(-40, 1400);
     } else if (routine1Stage == 15) {
       turnGen(-1, 1600);
     } else if (routine1Stage == 16) {
-      moveForBack(-50, 3000);
+      moveForBack(-40, 3000);
     } else if (routine1Stage == 17) {
       turnGen(-1, 1500);
     } else if (routine1Stage == 18) {
-      moveForBack(-50, 2600);
+      moveForBack(-40, 2600);
     } else if (routine1Stage == 19) {
       turnGen(1, 4500);
     } else {
