@@ -193,6 +193,7 @@ int ambient2[numLEDs];
 int ambient3[numLEDs];
 int ambient4[numLEDs];
 int ambient5[numLEDs];
+int ambient6[numLEDs];
 
 boolean leftLights[(numLEDs + numLidLEDsGreen + numLidLEDsRed)] = {true, true, false, true, false, false, true, false, false, false, true, true, false, true};
 
@@ -283,8 +284,8 @@ void setup()
    soundsArray[4].millisecs = 1000;
    strcpy(soundsArray[5].soundName, "Glass Bottle");
    soundsArray[5].millisecs = 1000;
-   strcpy(soundsArray[6].soundName, "Rolling");
-   soundsArray[6].millisecs = 680;
+   strcpy(soundsArray[6].soundName, "TRASH");
+   soundsArray[6].millisecs = 1200;
    strcpy(soundsArray[7].soundName, "Bin Close");
    soundsArray[7].millisecs = 3000;
    strcpy(soundsArray[8].soundName, "Bin Open");
@@ -324,6 +325,7 @@ void setup()
       ambient3[i] = (i % 3 == 2) ? ledMaxBright : 0;
       ambient4[i] = (i % 3 == 0) ? ledMaxBright : ((i % 2 == 0) ? ledMaxBright/3 : 0);
       ambient5[i] = (i % 2 == 1) ? ledMaxBright : 0;
+      ambient6[i] = (i % 4 == 1) ? ledMaxBright : ((i % 2 == 0) ? ledMaxBright * 2 / 3 : ledMaxBright / 3);
     }
 
    //Infrared
@@ -805,7 +807,7 @@ void ambientLights() {
     for (int i = 0; i < numLEDs; i++) {
       LEDControl.setPWM(i, ambient5[i]);
     }
-  }
+  } 
 
   for (int i = numLEDs; i < numLEDs + numLidLEDsGreen + numLidLEDsRed; i++) {
     LEDControl.setPWM(i, 0);
@@ -910,7 +912,7 @@ void routineSounds() {
   if (!routineSoundTriggered) {
     //randomize track
     changeTrack = true;
-    track = random(1, 6);
+    track = random(1, 7);
     myMP3Trigger.setVolume(25);
     myMP3Trigger.trigger(track /*+ offset*/);
     soundTimer = millis();
@@ -941,6 +943,10 @@ void routineLights() {
       } else if (track == 5) {
         for (int i = 0; i < numLEDs; i++) {
           LEDControl.setPWM(i, ambient5[i]);
+        }
+      } else if (track == 6) {
+        for (int i = 0; i < numLEDs; i++) {
+          LEDControl.setPWM(i, ambient6[i]);
         }
       }
     
